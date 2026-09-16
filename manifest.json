@@ -1,0 +1,33 @@
+{
+  "name": "115年農村社區綠色照顧推動計畫 - 自評表產生器",
+  "short_name": "綠色照顧自評表",
+  "description": "115年農村社區綠色照顧推動計畫 社區自評表 Excel → Word 批次產生工具",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f5ec",
+  "theme_color": "#5a8b3a",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "government"]
+}

@@ -2,7 +2,12 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>115年農村社區綠色照顧推動計畫 - 自評表批次產生器</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5a8b3a">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
@@ -726,6 +731,13 @@ function applyMapping(xml, mapping) {
   // 清掉沒對到的 placeholder（保留 □）
   out = out.replace(/\{\{[^}]+\}\}/g, '');
   return out;
+// ========== 註冊 Service Worker (PWA 支援) ==========
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('[SW] 已註冊:', reg.scope))
+      .catch(err => console.warn('[SW] 註冊失敗:', err.message));
+  });
 }
 </script>
 </body>
