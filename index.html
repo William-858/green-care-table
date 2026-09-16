@@ -2,7 +2,12 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>115年農村社區綠色照顧推動計畫 - 自評表批次產生器</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5a8b3a">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
@@ -407,20 +412,41 @@ function buildMapping(row) {
   m.CHK_共餐菜園 = chk(venueField.includes('共餐菜園'));
   m.CHK_療育花園 = chk(venueField.includes('療育花園'));
   m.CHK_綠場域_其他 = chk(venueField.includes('其他'));
-  // 把整段文字塞進 "處" 欄，其餘留空
-  m.VENUE_共餐菜園_處 = communityGarden || (venueField.includes('共餐菜園') ? '' : '未申請');
-  m.VENUE_共餐菜園_面積 = '';
-  m.VENUE_共餐菜園_距 = '';
-  m.VENUE_療育花園_處 = therapyGarden || (venueField.includes('療育花園') ? '' : '未申請');
-  m.VENUE_療育花園_面積 = '';
-  m.VENUE_療育花園_距 = '';
+
+  // 拆「共1處，面積為5.33平方公尺，距據點約100公尺」等格式
+  function parseVenue(str) {
+    if (!str) return { 處: '', 面積: '', 距: '' };
+    const 處 = (str.match(/(\d+)\s*處/) || [])[1] || '';
+    // 面積：先找「面積為/約 X 平方公尺」，再找出現「平方公尺」前的數字
+    let 面積 = (str.match(/面積[為約]?\s*([\d.]+)/) || [])[1]
+            || (str.match(/([\d.]+)\s*平方公尺/) || [])[1] || '';
+    // 括號補充 (例如 "(約20坪)") 併入面積
+    const paren = (str.match(/\(([^)]+)\)/) || [])[1];
+    if (paren && 面積) 面積 = 面積 + '(' + paren + ')';
+    const 距 = (str.match(/距[^\d]*([\d.]+)/) || [])[1] || '';
+    // 若什麼結構都沒解出來，把整段塞入面積欄（保住原始資訊）
+    if (!處 && !面積 && !距) 面積 = str;
+    return { 處, 面積, 距 };
+  }
+  const cg = parseVenue(communityGarden);
+  const tg = parseVenue(therapyGarden);
+  m.VENUE_共餐菜園_處 = cg.處;
+  m.VENUE_共餐菜園_面積 = cg.面積;
+  m.VENUE_共餐菜園_距 = cg.距;
+  m.VENUE_療育花園_處 = tg.處;
+  m.VENUE_療育花園_面積 = tg.面積;
+  m.VENUE_療育花園_距 = tg.距;
   m.VENUE_其他 = '';
 
-  // 未申請綠場域主軸的話，整段標「未申請」
+  // 未申請本主軸 → 把整格提示「未申請」，只留一處
   const isVenueApplied = get('請勾選各年度執行主軸  [115年主軸]').includes('綠場域');
   if (!isVenueApplied) {
     m.VENUE_共餐菜園_處 = '未申請';
+    m.VENUE_共餐菜園_面積 = '';
+    m.VENUE_共餐菜園_距 = '';
     m.VENUE_療育花園_處 = '';
+    m.VENUE_療育花園_面積 = '';
+    m.VENUE_療育花園_距 = '';
   }
 
   // ---------- 綠飲食 ----------
@@ -436,11 +462,15 @@ function buildMapping(row) {
   m.FOOD_天數 = d1;
   m.FOOD_週數 = d2;
 
-  // 人數
+  // 人數：格式多元「共餐33人」「送餐20人/取餐20人」「送餐27人/定點取餐5人/配合節慶活動共餐約25人」
   const people = get('綠飲食-送餐人數/定點取餐人數/共餐人數');
-  m.FOOD_送餐人數 = extractNum(people, /送餐(\d+)/);
-  m.FOOD_取餐人數 = extractNum(people, /(?:取餐|定點取餐)(\d+)/);
-  m.FOOD_共餐人數 = extractNum(people, /共餐(\d+)/);
+  m.FOOD_送餐人數 = extractNum(people, /送餐[^\d]*(\d+)/);
+  m.FOOD_取餐人數 = extractNum(people, /(?:定點)?取餐[^\d]*(\d+)/);
+  m.FOOD_共餐人數 = extractNum(people, /共餐[^\d]*(\d+)/);
+  // 若三格都沒解出來但整串有內容 → 塞第一格
+  if (!m.FOOD_送餐人數 && !m.FOOD_取餐人數 && !m.FOOD_共餐人數 && people) {
+    m.FOOD_送餐人數 = people;
+  }
 
   // 服務鄰近
   const nearby = get('綠飲食-是否服務鄰近社區');
@@ -451,13 +481,14 @@ function buildMapping(row) {
   m.FOOD_鄰近_名稱 = nearbyInfo;
   m.FOOD_鄰近_人 = '';
 
-  // 供餐星期
+  // 供餐星期：只認「星期X」/「週X」/「禮拜X」的精確組合，避免「一」「三」被誤觸發
   const weekdays = get('綠飲食- 供餐星期與餐食情形');
-  m.CHK_供餐_一 = chk(weekdays.includes('星期一') || weekdays.includes('一'));
-  m.CHK_供餐_二 = chk(weekdays.includes('星期二') || (weekdays.includes('二') && !weekdays.includes('十二')));
-  m.CHK_供餐_三 = chk(weekdays.includes('星期三') || weekdays.includes('三'));
-  m.CHK_供餐_四 = chk(weekdays.includes('星期四') || weekdays.includes('四'));
-  m.CHK_供餐_五 = chk(weekdays.includes('星期五') || weekdays.includes('五'));
+  const hasWeekday = (ch) => new RegExp(`(?:星期|週|禮拜)${ch}`).test(weekdays);
+  m.CHK_供餐_一 = chk(hasWeekday('一'));
+  m.CHK_供餐_二 = chk(hasWeekday('二'));
+  m.CHK_供餐_三 = chk(hasWeekday('三'));
+  m.CHK_供餐_四 = chk(hasWeekday('四'));
+  m.CHK_供餐_五 = chk(hasWeekday('五'));
 
   if (!isFoodApplied) {
     // 綠飲食未申請
@@ -467,6 +498,13 @@ function buildMapping(row) {
     m.FOOD_取餐人數 = '';
     m.FOOD_共餐人數 = '';
     m.FOOD_鄰近_名稱 = '';
+    m.CHK_供餐_一 = UNCHK;
+    m.CHK_供餐_二 = UNCHK;
+    m.CHK_供餐_三 = UNCHK;
+    m.CHK_供餐_四 = UNCHK;
+    m.CHK_供餐_五 = UNCHK;
+    m.CHK_服務鄰近_有 = UNCHK;
+    m.CHK_服務鄰近_無 = UNCHK;
   }
 
   // ---------- 綠療育 ----------
@@ -506,16 +544,23 @@ function buildMapping(row) {
   m.CHK_志工_無 = chk(hasVol.startsWith('否'));
   m.COMP_志工人數 = get('綠陪伴-志工人數');
 
-  // 到府關懷 "11 22"、"5 129" (位/人次) 
-  const visit = get('綠陪伴-每月平均到府關懷人數/共計人次');
-  const visitNums = visit.match(/\d+/g) || [];
-  m.COMP_到府_位 = visitNums[0] || '';
-  m.COMP_到府_人次 = visitNums[1] || '';
-
-  const call = get('綠陪伴-每月平均電話問安人數/共計人次');
-  const callNums = call.match(/\d+/g) || [];
-  m.COMP_電話_位 = callNums[0] || '';
-  m.COMP_電話_人次 = callNums[1] || '';
+  // 到府關懷/電話問安：格式多元「11」「25/100」「129人次」「4次」
+  function parseVisit(str) {
+    const nums = (str || '').match(/\d+/g) || [];
+    if (nums.length >= 2) return { 位: nums[0], 人次: nums[1] };
+    if (nums.length === 1) {
+      // 只有一個數字：看整串是否含「人次」或「次」→ 判定為人次；否則為位
+      if (/人次|次/.test(str)) return { 位: '', 人次: nums[0] };
+      return { 位: nums[0], 人次: '' };
+    }
+    return { 位: '', 人次: '' };
+  }
+  const visit = parseVisit(get('綠陪伴-每月平均到府關懷人數/共計人次'));
+  m.COMP_到府_位 = visit.位;
+  m.COMP_到府_人次 = visit.人次;
+  const call = parseVisit(get('綠陪伴-每月平均電話問安人數/共計人次'));
+  m.COMP_電話_位 = call.位;
+  m.COMP_電話_人次 = call.人次;
 
   const grade = get('綠陪伴-是否建立分級制度');
   m.CHK_分級_有 = chk(grade.startsWith('是'));
@@ -570,18 +615,28 @@ function buildMapping(row) {
 
   // ---------- Q2-1 食材來源 / 供餐方式 ----------
   const foodSource = get('2-1-1  供餐食材來源');
-  m.CHK_食材_共餐菜園 = chk(foodSource.includes('共餐菜園'));
-  m.CHK_食材_在地 = chk(foodSource.includes('在地農民') || foodSource.includes('合作社'));
-  m.CHK_食材_其他 = chk(foodSource.includes('其他') || (foodSource && !foodSource.includes('共餐菜園') && !foodSource.includes('在地')));
-  m.Q2_1_食材其他 = foodSource; // 完整內容塞到「其他」
+  const hasGarden = foodSource.includes('共餐菜園');
+  const hasLocal = foodSource.includes('在地農民') || foodSource.includes('合作社');
+  // 「其他」的判定：把已知選項字串移除後，若還有剩就是其他
+  let otherText = foodSource
+    .replace(/共餐菜園/g, '')
+    .replace(/在地農民或合作社/g, '')
+    .replace(/在地農民/g, '')
+    .replace(/[,、\s]+/g, ' ')
+    .trim();
+  m.CHK_食材_共餐菜園 = chk(hasGarden);
+  m.CHK_食材_在地 = chk(hasLocal);
+  m.CHK_食材_其他 = chk(otherText.length > 0);
+  m.Q2_1_食材其他 = otherText;
 
   const foodWay = get('2-1-2. 供餐方式');
   const supplier = get('2-1-3.   供餐廠商或外部供餐單位名稱');
   m.CHK_供餐_自煮 = chk(foodWay.includes('自行烹煮') || foodWay.includes('自煮'));
   m.CHK_供餐_外購 = chk(foodWay.includes('外購') || foodWay.includes('便當'));
   m.CHK_供餐_合作 = chk(foodWay.includes('農會') || foodWay.includes('田媽媽') || foodWay.includes('團膳'));
-  m.Q2_1_供餐廠商 = supplier;
-  m.Q2_1_合作名稱 = supplier;
+  // supplier 只填到勾中的欄位，避免同一個名稱重複出現在兩處
+  m.Q2_1_供餐廠商 = m.CHK_供餐_外購 === CHK ? supplier : '';
+  m.Q2_1_合作名稱 = m.CHK_供餐_合作 === CHK ? supplier : '';
 
   // ---------- Q2-2-3 留樣 ----------
   const sample = get('2-2-3. 餐食是否分別留樣? (1道菜約200g，須分別密封以攝氏7度以下冷藏保存至少48小時)');
@@ -615,9 +670,10 @@ function buildMapping(row) {
   m.Q3_1_1_REASON = '';
 
   // ---------- Q3-2-1 師資分配 ----------
+  // 格式多元：「外聘60堂」「外聘堂數 8  堂、內聘堂數 47  堂」等
   const teach = get('3-2-1. 師資及課程配置');
-  m.Q3_2_1_外聘 = extractNum(teach, /外聘\s*(\d+)/);
-  m.Q3_2_1_內聘 = extractNum(teach, /內聘\s*(\d+)/);
+  m.Q3_2_1_外聘 = extractNum(teach, /外聘[^\d]*(\d+)/);
+  m.Q3_2_1_內聘 = extractNum(teach, /內聘[^\d]*(\d+)/);
 
   // ---------- Q3-3-1 綠照員參與 ----------
   const carerJoin = get('3-3-1.  綠照員是否參與課程規劃、教案設計或課程教學？');
@@ -639,7 +695,7 @@ function buildMapping(row) {
   m.Q4_1_1_時薪額 = extractNum(carerFee, /時薪[^\d]*(\d+)/);
   m.Q4_1_1_時數 = extractNum(carerFee, /(\d+)\s*小時/);
   m.Q4_1_1_週天 = extractNum(carerFee, /(\d+)\s*天/);
-  m.Q4_1_1_其他說明 = carerFee;
+  m.Q4_1_1_其他說明 = m.Q4_1_1_其他 === CHK ? carerFee : '';
 
   // ---------- Q4-2-1 關懷頻率 ----------
   const careFreq = get('4-2-1.  社區高齡者關懷頻率？');
@@ -650,7 +706,7 @@ function buildMapping(row) {
   m.Q4_2_1_週次 = extractNum(careFreq, /每週\s*(\d+)/);
   m.Q4_2_1_月次 = extractNum(careFreq, /每月\s*(\d+)/);
   m.Q4_2_1_偶而頻率 = '';
-  m.Q4_2_1_其他說明 = careFreq;
+  m.Q4_2_1_其他說明 = m.Q4_2_1_其他 === CHK ? careFreq : '';
 
   // ---------- Q4-2-6 醫療合作 ----------
   const medCoop = get('4-2-6.  是否與醫療院所或健康照護單位建立合作或轉介管道？');
@@ -715,17 +771,24 @@ function splitHelps(str) {
 
 // ========== 套用對應表到 XML ==========
 function applyMapping(xml, mapping) {
-  // 先做 XML 特殊字元轉義
   const xmlEscape = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   let out = xml;
   for (const [key, val] of Object.entries(mapping)) {
-    const placeholder = `{{${key}}}`;
-    // 全局替換
+    const placeholder = '{' + '{' + key + '}' + '}';
     out = out.split(placeholder).join(xmlEscape(val));
   }
   // 清掉沒對到的 placeholder（保留 □）
-  out = out.replace(/\{\{[^}]+\}\}/g, '');
+  out = out.replace(new RegExp('\\{\\{[^}]+\\}\\}', 'g'), '');
   return out;
+}
+
+// ========== 註冊 Service Worker (PWA 支援) ==========
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('[SW] 已註冊:', reg.scope))
+      .catch(err => console.warn('[SW] 註冊失敗:', err.message));
+  });
 }
 </script>
 </body>
